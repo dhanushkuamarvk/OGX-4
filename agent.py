@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from llm import call_llm
+from llm import LLMError, call_llm
 
 
 def _make_step(step_id: str, title: str, description: str) -> dict[str, Any]:
@@ -47,7 +47,14 @@ def _maybe_finalize(state: dict[str, Any]) -> None:
             f"Constraints: {constraints}\n"
             f"Completed step outputs:\n{outputs}"
         )
-        state["final_answer"] = call_llm(prompt, json_mode=False)
+        try:
+            answer = call_llm(prompt, json_mode=False)
+            if not isinstance(answer, str) or not answer.strip():
+                raise LLMError("Final answer response was empty.")
+            state["final_answer"] = answer.strip()
+            state["error"] = ""
+        except LLMError as exc:
+            state["error"] = str(exc)
 
 
 def new_run(
@@ -57,39 +64,52 @@ def new_run(
 ) -> dict[str, Any]:
     """Generate a 5-6 step plan as JSON and return initial state."""
     c_list = list(constraints or [])
+    state: dict[str, Any] = {
+        "task_text": task_text,
+        "steps": [],
+        "constraints": c_list,
+        "paused": False,
+        "final_answer": "",
+        "planted_error": planted_error,
+        "planted_injected": False,
+        "error": "",
+    }
     prompt = (
         "Create a plan of 5-6 steps as a JSON list of objects with keys "
         '"id", "title", "description".\n'
         f"Task: {task_text}\n"
         f"Constraints: {', '.join(c_list) or 'None'}"
     )
-    raw = json.loads(call_llm(prompt, json_mode=True))
-    items = raw.get("steps", []) if isinstance(raw, dict) else raw
-    if not isinstance(items, list) or not items:
-        items = [{"id": "s1", "title": "Complete task", "description": task_text}]
+    try:
+        raw = json.loads(call_llm(prompt, json_mode=True))
+        items = raw.get("steps") if isinstance(raw, dict) else raw
+        if not isinstance(items, list) or not items:
+            raise LLMError("Plan response must be a non-empty JSON list.")
 
-    steps = [
-        _make_step(str(it.get("id") or f"s{i + 1}"), str(it.get("title") or f"Step {i + 1}"), str(it.get("description") or ""))
-        for i, it in enumerate(items[:6])
-    ]
-    return {
-        "task_text": task_text,
-        "steps": steps,
-        "constraints": c_list,
-        "paused": False,
-        "final_answer": "",
-        "planted_error": planted_error,
-        "planted_injected": False,
-    }
+        steps: list[dict[str, Any]] = []
+        for i, it in enumerate(items[:6]):
+            if not isinstance(it, dict):
+                raise LLMError("Each plan step must be a JSON object.")
+            title = str(it.get("title") or "").strip()
+            description = str(it.get("description") or "").strip()
+            if not title or not description:
+                raise LLMError("Each plan step must include non-empty title and description.")
+            step_id = str(it.get("id") or f"s{i + 1}").strip() or f"s{i + 1}"
+            steps.append(_make_step(step_id, title, description))
+        state["steps"] = steps
+    except (LLMError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        state["error"] = str(exc)
+    return state
 
 
 def advance(state: dict[str, Any]) -> dict[str, Any]:
     """Execute at most ONE pending/edited step and return updated state."""
-    state["planted_injected"] = False
     if state.get("paused"):
         return state
     if any(s["status"] == "needs_approval" for s in state["steps"]):
         return state
+    state["planted_injected"] = False
+    state["error"] = ""
 
     next_pair = next(
         ((i, s) for i, s in enumerate(state["steps"]) if s["status"] in ("pending", "edited")),
@@ -116,20 +136,38 @@ def advance(state: dict[str, Any]) -> dict[str, Any]:
         f"Status: {step['status']}\n"
         f"Previous step outputs:\n{prev_outputs or 'None'}"
     )
-    parsed = json.loads(call_llm(prompt, json_mode=True))
-    output = str(parsed.get("output", "")).strip()
     try:
-        conf = max(1, min(5, int(parsed.get("confidence", 3))))
-    except (TypeError, ValueError):
-        conf = 3
-    why = str(parsed.get("why", "")).strip()
+        parsed = json.loads(call_llm(prompt, json_mode=True))
+        if not isinstance(parsed, dict):
+            raise LLMError("Step response must be a JSON object.")
+        missing = [k for k in ("output", "confidence", "why") if k not in parsed]
+        if missing:
+            raise LLMError(f"Step response missing keys: {', '.join(missing)}")
+        output = str(parsed["output"] or "").strip()
+        if not output:
+            raise LLMError("Step response has empty output.")
+        try:
+            conf = max(1, min(5, int(parsed["confidence"])))
+        except (TypeError, ValueError) as exc:
+            raise LLMError(f"Invalid confidence value: {parsed['confidence']!r}") from exc
+        why = str(parsed["why"] or "").strip()
+    except (LLMError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        step["status"] = "pending"
+        state["error"] = str(exc)
+        return state
 
     pe = state.get("planted_error")
-    if isinstance(pe, dict) and pe.get("step_index") == idx and pe.get("wrong_fact_text"):
+    if (
+        isinstance(pe, dict)
+        and pe.get("step_index") == idx
+        and pe.get("wrong_fact_text")
+        and not state.get("_planted_done")
+    ):
         fact = str(pe["wrong_fact_text"]).strip()
         if fact and fact not in output:
             output = f"{output} {fact}".strip()
         state["planted_injected"] = True
+        state["_planted_done"] = True
 
     step["output"] = output
     step["confidence"] = conf
@@ -172,6 +210,7 @@ def delete_step(state: dict[str, Any], step_id: str) -> dict[str, Any]:
             step["status"] = "deleted"
             _reset_from(steps, i + 1)
             state["final_answer"] = ""
+            state["error"] = ""
             _maybe_finalize(state)
             break
     return state
@@ -201,9 +240,10 @@ def add_step(
 
 
 def add_constraint(state: dict[str, Any], text: str) -> dict[str, Any]:
-    cleaned = text.strip()
-    if cleaned and cleaned not in state["constraints"]:
-        state["constraints"].append(cleaned)
+    cleaned = (text or "").strip()
+    if not cleaned or cleaned in state["constraints"]:
+        return state
+    state["constraints"].append(cleaned)
     steps = state["steps"]
     first_incomplete = next((i for i, s in enumerate(steps) if s["status"] not in ("done", "deleted")), None)
     if first_incomplete is not None:
@@ -221,6 +261,7 @@ def approve(state: dict[str, Any], step_id: str) -> dict[str, Any]:
         if step["id"] == step_id and step["status"] == "needs_approval":
             step["status"] = "done"
             break
+    state["error"] = ""
     _maybe_finalize(state)
     return state
 

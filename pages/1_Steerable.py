@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -14,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import mock_agent as agent  # Swap to `import agent` when agent.py is ready
+import agent
 
 try:
     from logger import log_event
@@ -32,7 +33,7 @@ except ImportError:
 
 STATUS_COLORS = {
     "pending": ("#E2E8F0", "#334155"),
-    "running": ("#DBEAFE", "#1D4ED8"),
+    "running": ("#E2E8F0", "#334155"),
     "done": ("#DCFCE7", "#166534"),
     "needs_approval": ("#FEF3C7", "#92400E"),
     "edited": ("#EDE9FE", "#5B21B6"),
@@ -76,23 +77,27 @@ def _advance_once(state: dict, pid: str, tid: str) -> dict:
     if nxt:
         _log(pid, tid, "step_started", step_id=nxt["id"], details=nxt["title"])
     state = agent.advance(state) or state
-    pe = state.get("planted_error") or {}
-    logged_pe = st.session_state.setdefault("steerable_pe_logged", set())
-    for idx, s in enumerate(state["steps"]):
+    if state.get("error"):
+        _log(pid, tid, "agent_error", step_id=(nxt["id"] if nxt else ""), details=str(state["error"]))
+    advanced_sid = nxt["id"] if nxt else ""
+    for s in state["steps"]:
         if s["status"] != prev.get(s["id"]):
+            advanced_sid = s["id"]
             if s["status"] == "done":
                 _log(pid, tid, "step_done", step_id=s["id"], details=s["title"])
             elif s["status"] == "needs_approval":
                 _log(pid, tid, "approval_requested", step_id=s["id"], details=s.get("why", ""))
-            wrong = str(pe.get("wrong_fact_text") or "")
-            if pe and s["id"] not in logged_pe and s["status"] in ("done", "needs_approval"):
-                if (wrong and wrong.lower() in str(s.get("output", "")).lower()) or pe.get("step_index") == idx:
-                    _log(pid, tid, "planted_error_injected", step_id=s["id"], details=wrong)
-                    logged_pe.add(s["id"])
+    logged_pe = st.session_state.setdefault("steerable_pe_logged", set())
+    if state.get("planted_injected") is True and advanced_sid and advanced_sid not in logged_pe:
+        pe = state.get("planted_error") or {}
+        wrong = str(pe.get("wrong_fact_text") or "")
+        _log(pid, tid, "planted_error_injected", step_id=advanced_sid, details=wrong)
+        logged_pe.add(advanced_sid)
     return state
 
 
 st.set_page_config(page_title="Steerable Agent", layout="wide")
+demo_mode = os.getenv("DEMO_MODE") == "1"
 pid = str(st.session_state.get("participant_id") or "P01")
 tid = str(st.session_state.get("task_id") or "T1")
 planted_on = bool(st.session_state.get("planted_errors_enabled", False))
@@ -101,9 +106,13 @@ run_key = (pid, str(task["task_id"]), planted_on)
 
 if st.session_state.get("steerable_run_key") != run_key or "steerable_state" not in st.session_state:
     pe_cfg = task.get("planted_error") if planted_on else None
-    _log(pid, str(task["task_id"]), "session_start", details=f"planted_errors={planted_on}")
+    start_details = f"planted_errors={planted_on};demo=true" if demo_mode else f"planted_errors={planted_on}"
+    _log(pid, str(task["task_id"]), "session_start", details=start_details)
     init_state = agent.new_run(task["prompt"], constraints=[], planted_error=pe_cfg)
-    _log(pid, str(task["task_id"]), "plan_generated", details=f"{len(init_state['steps'])} steps")
+    if init_state.get("error"):
+        _log(pid, str(task["task_id"]), "agent_error", details=str(init_state["error"]))
+    else:
+        _log(pid, str(task["task_id"]), "plan_generated", details=f"{len(init_state['steps'])} steps")
     st.session_state.update({
         "steerable_run_key": run_key,
         "steerable_state": init_state,
@@ -118,7 +127,9 @@ waiting_approval = any(s["status"] == "needs_approval" for s in state["steps"])
 finished = agent.is_finished(state)
 
 st.title("Steerable Agent")
-st.caption(f"Participant: `{pid}` · Task: **{task.get('title', tid)}** (`{tid}`) · Planted errors: `{planted_on}`")
+if demo_mode:
+    st.warning("**DEMO MODE** — Running with offline canned responses (`DEMO_MODE=1`).")
+st.caption(f"Participant: `{pid}` · Task: **{task.get('title', tid)}** (`{tid}`)")
 
 # Top bar: Pause/Resume, Add step, Add constraint + constraint chips
 bar1, bar2, bar3, bar4 = st.columns([1.0, 1.2, 2.2, 0.8])
@@ -146,20 +157,38 @@ with bar2:
             state = agent.add_step(state, s_title.strip(), s_desc.strip(), after_id=after_id) or state
             new_id = next((s["id"] for s in state["steps"] if s["id"] not in before_ids), "")
             _log(pid, tid, "add_step", step_id=new_id, details=s_title.strip())
-            st.session_state["steerable_state"] = state
+            st.session_state.update({"steerable_state": state, "steerable_finished_ui": False})
             st.rerun()
 with bar3:
     c_text = st.text_input("Add constraint", placeholder="Add constraint...", label_visibility="collapsed", key="c_input")
 with bar4:
     if st.button("Add", use_container_width=True) and c_text.strip():
+        prev_constraints = list(state["constraints"])
         state = agent.add_constraint(state, c_text.strip()) or state
-        _log(pid, tid, "add_constraint", details=c_text.strip())
+        if state["constraints"] != prev_constraints:
+            _log(pid, tid, "add_constraint", details=c_text.strip())
+            st.session_state["steerable_finished_ui"] = False
         st.session_state["steerable_state"] = state
         st.rerun()
 
 if state["constraints"]:
     chips = "".join(_pill(c, "#E0F2FE", "#075985") for c in state["constraints"])
     st.markdown(f"**Constraints:** {chips}", unsafe_allow_html=True)
+
+if state.get("error"):
+    st.error(f"Agent error: {state['error']}")
+    if st.button("🔄 Retry", key="steerable_retry_btn", type="primary"):
+        if not state.get("steps"):
+            pe_cfg = task.get("planted_error") if planted_on else None
+            state = agent.new_run(task["prompt"], constraints=state.get("constraints", []), planted_error=pe_cfg)
+            if state.get("error"):
+                _log(pid, tid, "agent_error", details=str(state["error"]))
+            else:
+                _log(pid, tid, "plan_generated", details=f"{len(state['steps'])} steps")
+        else:
+            state["error"] = ""
+        st.session_state["steerable_state"] = state
+        st.rerun()
 
 left_col, right_col = st.columns([1.25, 1.0], gap="large")
 
@@ -169,13 +198,13 @@ with left_col:
         sid, status = step["id"], step["status"]
         bg, fg = STATUS_COLORS.get(status, ("#E2E8F0", "#1E293B"))
         conf = step.get("confidence")
-        conf_html = _pill(f"{conf:.0%}" if isinstance(conf, (int, float)) and conf <= 1 else str(conf), "#F1F5F9", "#334155") if conf is not None else ""
+        conf_html = _pill(f"{conf}/5", "#F1F5F9", "#334155") if conf is not None else ""
         with st.container(border=True):
             if status == "needs_approval":
                 st.warning(f"⚠️ **Approval Needed — {idx + 1}. {step['title']}**")
             st.markdown(f"**{idx + 1}. {step['title']}** &nbsp;{_pill(status, bg, fg)}{conf_html}", unsafe_allow_html=True)
             st.write(step["description"])
-            if status == "done" and step.get("why"):
+            if status in ("done", "needs_approval") and step.get("why"):
                 st.caption(f"Why: {step['why']}")
 
             if status == "needs_approval":
@@ -183,6 +212,8 @@ with left_col:
                 if a1.button("✅ Approve", key=f"app_{sid}", type="primary", use_container_width=True):
                     state = agent.approve(state, sid) or state
                     _log(pid, tid, "approved", step_id=sid)
+                    if state.get("error"):
+                        _log(pid, tid, "agent_error", step_id=sid, details=str(state["error"]))
                     st.session_state["steerable_state"] = state
                     st.rerun()
                 if a2.button("✏️ Edit-and-rerun", key=f"edr_{sid}", use_container_width=True):
@@ -196,7 +227,9 @@ with left_col:
                 if b2.button("Delete", key=f"del_{sid}", use_container_width=True):
                     state = agent.delete_step(state, sid) or state
                     _log(pid, tid, "delete_step", step_id=sid)
-                    st.session_state["steerable_state"] = state
+                    if state.get("error"):
+                        _log(pid, tid, "agent_error", step_id=sid, details=str(state["error"]))
+                    st.session_state.update({"steerable_state": state, "steerable_finished_ui": False})
                     st.rerun()
 
             if st.session_state.get("steerable_edit_id") == sid:
@@ -207,7 +240,7 @@ with left_col:
                     if state["paused"]:
                         state = agent.resume(state) or state
                     _log(pid, tid, "edit_step", step_id=sid, details=new_desc.strip())
-                    st.session_state.update({"steerable_state": state, "steerable_edit_id": None})
+                    st.session_state.update({"steerable_state": state, "steerable_edit_id": None, "steerable_finished_ui": False})
                     st.rerun()
                 if s2.button("Cancel", key=f"can_{sid}", use_container_width=True):
                     st.session_state["steerable_edit_id"] = None
@@ -236,7 +269,7 @@ with right_col:
         else:
             render_questionnaire(pid, "steerable", tid)
 
-if not state["paused"] and not waiting_approval and not finished:
+if not state["paused"] and not waiting_approval and not finished and not state.get("error"):
     st.session_state["steerable_state"] = _advance_once(state, pid, tid)
     time.sleep(0.35)
     st.rerun()

@@ -1,0 +1,32 @@
+[
+  {
+    "task_id": "A",
+    "title": "Coding & Study Laptop for College Student (INR)",
+    "prompt": "Research laptop options currently available in India and recommend the best single laptop for a B.Tech computer science student. Constraints: (1) strict budget <= INR 65,000, (2) at least 16 GB RAM and 512 GB SSD, (3) weight under 1.7 kg with >= 7 hours real-world battery life for campus use, and (4) reliable India service network. Compare top 3 contenders, justify trade-offs, and give a clear recommendation.",
+    "planted_error": {
+      "step_index": 1,
+      "wrong_fact_text": "Note from spec check: the Lenovo IdeaPad Slim 5 (16 GB / 512 GB) weighs 2.4 kg and includes only a 4-hour battery."
+    }
+  },
+  {
+    "task_id": "B",
+    "title": "5G Smartphone for Commuting Student (INR)",
+    "prompt": "Research 5G smartphones currently sold in India and recommend the best single phone for a university student who commutes daily. Constraints: (1) strict budget <= INR 25,000, (2) >= 5,000 mAh battery with fast charging, (3) at least 256 GB storage and clean software with >= 3 years of security updates, and (4) strong daylight camera for scanning lecture notes. Compare top 3 contenders, justify trade-offs, and give a clear recommendation.",
+    "planted_error": null
+  },
+  {
+    "task_id": "C",
+    "title": "Online Data Science Upskilling Track (INR)",
+    "prompt": "Research self-paced online Data Science & Python certification programs accessible from India and recommend the best single option for a final-year undergraduate. Constraints: (1) total cost <= INR 12,000 (including exam/certificate fee), (2) <= 10 hours/week over at most 16 weeks alongside classes, (3) hands-on portfolio projects in pandas/scikit-learn, and (4) verified completion certificate. Compare top 3 contenders, justify trade-offs, and give a clear recommendation.",
+    "planted_error": {
+      "step_index": 1,
+      "wrong_fact_text": "Pricing check indicates the NPTEL / IIT Madras Data Science certification exam costs INR 28,000 per course."
+    }
+  },
+  {
+    "task_id": "D",
+    "title": "Note-Taking & PDF Study Tool Stack (INR)",
+    "prompt": "Research digital note-taking and PDF annotation tools for an engineering student in India managing textbooks, lecture slides, and exam prep. Constraints: (1) annual cost <= INR 3,500 (or free student tier), (2) offline support on both Windows/Mac laptop and Android tablet, (3) easy export to Markdown/PDF without vendor lock-in, and (4) fast search across 100+ PDFs. Compare top 3 contenders, justify trade-offs, and give a clear recommendation.",
+    "planted_error": null
+  }
+]

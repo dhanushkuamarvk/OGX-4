@@ -14,6 +14,10 @@ except ImportError:
     pass
 
 
+class LLMError(RuntimeError):
+    """Raised when an LLM call fails or returns invalid JSON outside DEMO_MODE=1."""
+
+
 def _strip_fences(text: str) -> str:
     cleaned = text.strip()
     if cleaned.startswith("```"):
@@ -30,7 +34,7 @@ def _extract_line(prompt: str, prefix: str, default: str = "") -> str:
 
 
 def _demo_response(prompt: str, json_mode: bool) -> str:
-    """Return realistic canned responses for DEMO_MODE=1 and safe fallbacks."""
+    """Return realistic canned responses ONLY when DEMO_MODE=1."""
     if not json_mode:
         constraints = _extract_line(prompt, "Constraints:", "None")
         task = _extract_line(prompt, "Task:", "the assigned task")
@@ -74,39 +78,76 @@ def _demo_response(prompt: str, json_mode: bool) -> str:
     )
 
 
+def _expects_plan_list(prompt: str) -> bool:
+    lower = prompt.lower()
+    return "create a plan" in lower or "json list" in lower
+
+
+def _validate_json(text: str, expect_list: bool = False) -> str:
+    cleaned = _strip_fences(text)
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        raise LLMError("invalid JSON") from exc
+
+    if expect_list:
+        valid = isinstance(parsed, list) or (
+            isinstance(parsed, dict) and isinstance(parsed.get("steps"), list)
+        )
+        if not valid:
+            raise LLMError(f"expected JSON list, got {type(parsed).__name__}")
+    else:
+        if not isinstance(parsed, dict):
+            raise LLMError(f"expected JSON object, got {type(parsed).__name__}")
+    return cleaned
+
+
 def _call_gemini(prompt: str, json_mode: bool) -> str:
-    import google.generativeai as genai
+    try:
+        import google.generativeai as genai
+    except Exception as exc:
+        raise LLMError(f"Gemini SDK unavailable: {exc}") from exc
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY is not set (set DEMO_MODE=1 for offline demo).")
+        raise LLMError("GEMINI_API_KEY is not set (set DEMO_MODE=1 for offline demo).")
 
-    genai.configure(api_key=api_key)
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-    model = genai.GenerativeModel(model_name)
-    cfg = {"response_mime_type": "application/json"} if json_mode else None
-    resp = model.generate_content(prompt, generation_config=cfg)
-    return (resp.text or "").strip()
+    try:
+        genai.configure(api_key=api_key)
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        model = genai.GenerativeModel(model_name)
+        cfg = {"response_mime_type": "application/json"} if json_mode else None
+        resp = model.generate_content(prompt, generation_config=cfg)
+        return (resp.text or "").strip()
+    except LLMError:
+        raise
+    except Exception as exc:
+        raise LLMError(f"Gemini API error: {exc}") from exc
 
 
 def call_llm(prompt: str, json_mode: bool = False) -> str:
-    """Call Gemini (or canned responses when DEMO_MODE=1). Retries once on JSON failure."""
+    """Call Gemini (or canned responses ONLY when DEMO_MODE=1). Retries once on JSON failure."""
     if os.getenv("DEMO_MODE") == "1":
         return _demo_response(prompt, json_mode)
 
     raw = _call_gemini(prompt, json_mode)
     if not json_mode:
+        if not raw:
+            raise LLMError("Gemini returned an empty response.")
         return raw
 
-    cleaned = _strip_fences(raw)
+    expect_list = _expects_plan_list(prompt)
     try:
-        json.loads(cleaned)
-        return cleaned
-    except json.JSONDecodeError:
-        retry_prompt = f"{prompt}\n\nIMPORTANT: Return ONLY valid JSON with no markdown or extra text."
-        retry_raw = _strip_fences(_call_gemini(retry_prompt, json_mode=True))
+        return _validate_json(raw, expect_list=expect_list)
+    except LLMError:
+        hint = (
+            "Return ONLY a valid JSON list with no markdown or extra text."
+            if expect_list
+            else "Return ONLY a valid JSON object with no markdown or extra text."
+        )
+        retry_prompt = f"{prompt}\n\nIMPORTANT: {hint}"
+        retry_raw = _call_gemini(retry_prompt, json_mode=True)
         try:
-            json.loads(retry_raw)
-            return retry_raw
-        except json.JSONDecodeError:
-            return _demo_response(prompt, json_mode=True)
+            return _validate_json(retry_raw, expect_list=expect_list)
+        except LLMError as exc:
+            raise LLMError("invalid JSON after retry") from exc
