@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Frontends
+node_modules/
+frontend/coplan/dist/
+frontend/baseline/dist/
+*.local
+
+# Environment & Secrets
+.env
+
+# Runtime Data & Raw Study Logs
+data/
+*.db
+*.db-wal
+*.db-shm
+eval/raw_logs/*.jsonl
+eval/raw_logs/*.csv
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

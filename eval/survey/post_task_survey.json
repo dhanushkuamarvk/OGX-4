@@ -1,0 +1,32 @@
+{
+  "study": "Co-Plan vs Baseline — Resurrect 2026 Problem 3",
+  "design": "Within-subjects counterbalanced (AB/BA) across Co-Plan (treatment) and Baseline (control)",
+  "scales": {
+    "nasa_tlx": {
+      "range": [1, 7],
+      "items": [
+        { "id": "tlx_mental", "label": "Mental Demand", "prompt": "How mentally demanding was the task?" },
+        { "id": "tlx_temporal", "label": "Temporal Demand", "prompt": "How hurried or rushed was the pace of the task?" },
+        { "id": "tlx_performance", "label": "Performance", "prompt": "How successful were you in accomplishing what you were asked to do?", "reverse_scored": true },
+        { "id": "tlx_effort", "label": "Effort", "prompt": "How hard did you have to work to accomplish your level of performance?" },
+        { "id": "tlx_frustration", "label": "Frustration", "prompt": "How insecure, discouraged, irritated, stressed, or annoyed were you?" }
+      ]
+    },
+    "hai_agency_and_control": {
+      "range": [1, 7],
+      "items": [
+        { "id": "agency_steer", "prompt": "I felt in control of the agent's direction throughout the task." },
+        { "id": "agency_visibility", "prompt": "I could easily tell what the agent was planning and doing at every moment." },
+        { "id": "agency_pivot", "prompt": "Handling the mid-task requirement change felt smooth and predictable." },
+        { "id": "agency_preservation", "prompt": "I trusted the system not to overwrite or break parts of the document I already approved." },
+        { "id": "agency_recovery", "prompt": "When the agent went off-track, recovering to a good state was effortless." },
+        { "id": "agency_autonomy", "prompt": "The agent paused for my input at the right moments without nagging me." }
+      ]
+    },
+    "open_ended": [
+      { "id": "oe_best", "prompt": "What helped you most when steering the agent after the mid-task requirement change?" },
+      { "id": "oe_friction", "prompt": "What caused the most friction or confusion in this interface?" },
+      { "id": "oe_preference", "prompt": "Comparing both interfaces, which would you prefer for real high-stakes work and why?" }
+    ]
+  }
+}

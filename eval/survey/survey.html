@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Co-Plan Study — Post-Task Evaluation Survey</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #4f46e5;
+      --accent-dark: #4338ca;
+      --ok: #059669;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 860px;
+      margin: 32px auto;
+      padding: 0 20px 64px;
+    }
+    header {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    h1 { margin: 0 0 6px; font-size: 1.45rem; }
+    h2 { margin: 0 0 12px; font-size: 1.15rem; color: #1e293b; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    p.sub { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 28px;
+      margin-bottom: 18px;
+    }
+    .grid-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+    }
+    label.field { display: block; font-size: 0.85rem; font-weight: 600; color: #334155; }
+    input[type="text"], select, textarea {
+      width: 100%;
+      margin-top: 6px;
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-family: inherit;
+    }
+    .tlx-item {
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .tlx-item:last-child { border-bottom: none; }
+    .tlx-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .tlx-val {
+      font-family: ui-monospace, monospace;
+      font-weight: 700;
+      color: var(--accent);
+      min-width: 44px;
+      text-align: right;
+    }
+    input[type="range"] { width: 100%; margin: 8px 0 4px; accent-color: var(--accent); }
+    .anchors {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .likert-row {
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .likert-row:last-child { border-bottom: none; }
+    .likert-q { font-size: 0.92rem; margin-bottom: 8px; font-weight: 500; }
+    .likert-opts {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+    .likert-opts label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px 4px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      background: #f8fafc;
+    }
+    .likert-opts input { margin-bottom: 3px; accent-color: var(--accent); }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+    }
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 11px 18px;
+      font-weight: 600;
+      font-size: 0.92rem;
+      cursor: pointer;
+    }
+    button.primary { background: var(--accent); color: #fff; }
+    button.primary:hover { background: var(--accent-dark); }
+    button.secondary { background: #e2e8f0; color: #0f172a; }
+    pre#output {
+      margin-top: 14px;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      display: none;
+    }
+    .score-pill {
+      display: inline-block;
+      background: #eef2ff;
+      color: #3730a3;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Post-Task Evaluation Survey — Co-Plan HAI Study</h1>
+      <p class="sub">Complete immediately after finishing a task round. Responses are saved locally as JSON for analysis (no external network transmission).</p>
+    </header>
+
+    <form id="surveyForm">
+      <section>
+        <h2>Session Metadata</h2>
+        <div class="grid-meta">
+          <label class="field">Participant ID
+            <input type="text" id="participant_id" required placeholder="e.g. P01" />
+          </label>
+          <label class="field">Condition
+            <select id="condition" required>
+              <option value="coplan">Co-Plan (Shared Workspace)</option>
+              <option value="baseline">Baseline (Conventional Chat)</option>
+            </select>
+          </label>
+          <label class="field">Task
+            <select id="task_id" required>
+              <option value="task_research_brief">Research Brief (Microgrids)</option>
+              <option value="task_event_plan">Event Plan (Civic Tech Summit)</option>
+              <option value="task_data_analysis">Data-Analysis Report (SaaS Churn)</option>
+            </select>
+          </label>
+          <label class="field">Round
+            <select id="round_index" required>
+              <option value="1">Round 1</option>
+              <option value="2">Round 2</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Part 1 — NASA-TLX Workload (6 Subscales, Raw TLX 0–100)</h2>
+        <p class="sub" style="margin-bottom: 12px;">Move each slider from 0 to 100 in 5-point increments. Note: for Performance, 0 = Perfect success and 100 = Total failure (standard NASA-TLX scoring).</p>
+        <div id="tlxContainer"></div>
+      </section>
+
+      <section>
+        <h2>Part 2 — Trust in Automation (Jian et al., 2000; 1 = Not at all, 7 = Extremely)</h2>
+        <div id="trustContainer"></div>
+      </section>
+
+      <section>
+        <h2>Part 3 — Perceived Control &amp; Agency (1 = Strongly Disagree, 7 = Strongly Agree)</h2>
+        <div id="controlContainer"></div>
+      </section>
+
+      <section>
+        <h2>Part 4 — Open-Ended Reflections</h2>
+        <label class="field" style="margin-bottom: 14px;">1. What helped you most when handling the mid-task requirement change?
+          <textarea id="oe_recovery" rows="3" placeholder="Share specific moments or interface features..."></textarea>
+        </label>
+        <label class="field" style="margin-bottom: 14px;">2. What caused the most friction, confusion, or wasted effort?
+          <textarea id="oe_friction" rows="3" placeholder="Share anything that got in your way..."></textarea>
+        </label>
+        <label class="field">3. Any other comments about working with this AI interface?
+          <textarea id="oe_other" rows="2"></textarea>
+        </label>
+      </section>
+
+      <section>
+        <h2>Submit &amp; Export Local Record</h2>
+        <div id="summaryBar" style="margin-bottom: 10px;"></div>
+        <div class="actions">
+          <button type="submit" class="primary">Download Survey JSON</button>
+          <button type="button" class="secondary" id="copyBtn">Copy JSON to Clipboard</button>
+        </div>
+        <pre id="output"></pre>
+      </section>
+    </form>
+  </div>
+
+  <script>
+    const TLX_ITEMS = [
+      { id: "mental", label: "Mental Demand", desc: "How mentally demanding was the task?", low: "Very Low (0)", high: "Very High (100)" },
+      { id: "physical", label: "Physical Demand", desc: "How physically demanding was the task?", low: "Very Low (0)", high: "Very High (100)" },
+      { id: "temporal", label: "Temporal Demand", desc: "How hurried or rushed was the pace of the task?", low: "Very Low (0)", high: "Very High (100)" },
+      { id: "performance", label: "Performance (Failure)", desc: "How unsuccessful were you in accomplishing what you were asked to do?", low: "Perfect (0)", high: "Failure (100)" },
+      { id: "effort", label: "Effort", desc: "How hard did you have to work to accomplish your level of performance?", low: "Very Low (0)", high: "Very High (100)" },
+      { id: "frustration", label: "Frustration", desc: "How insecure, discouraged, irritated, stressed, and annoyed were you?", low: "Very Low (0)", high: "Very High (100)" },
+    ];
+
+    // Standard 12-item Jian et al. (2000) Trust in Automation Scale (items 1-5 reverse-scored)
+    const JIAN_TRUST_ITEMS = [
+      { id: "jian_1", reverse: true, text: "The system is deceptive." },
+      { id: "jian_2", reverse: true, text: "The system behaves in an underhanded manner." },
+      { id: "jian_3", reverse: true, text: "I am suspicious of the system's intent, action, or outputs." },
+      { id: "jian_4", reverse: true, text: "I am wary of the system." },
+      { id: "jian_5", reverse: true, text: "The system's actions will have a harmful or injurious outcome." },
+      { id: "jian_6", reverse: false, text: "I am confident in the system." },
+      { id: "jian_7", reverse: false, text: "The system provides security." },
+      { id: "jian_8", reverse: false, text: "The system has integrity." },
+      { id: "jian_9", reverse: false, text: "The system is dependable." },
+      { id: "jian_10", reverse: false, text: "The system is reliable." },
+      { id: "jian_11", reverse: false, text: "I can trust the system." },
+      { id: "jian_12", reverse: false, text: "I am familiar with the system." },
+    ];
+
+    const CONTROL_ITEMS = [
+      { id: "ctrl_1", text: "I felt in control of the agent's direction throughout the task." },
+      { id: "ctrl_2", text: "I could easily tell what the agent was planning and doing at each moment." },
+      { id: "ctrl_3", text: "Steering the agent after the mid-task requirement change felt smooth and predictable." },
+      { id: "ctrl_4", text: "I felt confident the system would not overwrite or break parts of my work I already approved." },
+      { id: "ctrl_5", text: "Recovering when the agent went off-track felt effortless." },
+      { id: "ctrl_6", text: "The system paused for my input at appropriate moments without slowing me down unnecessarily." },
+    ];
+
+    const tlxContainer = document.getElementById("tlxContainer");
+    TLX_ITEMS.forEach((item) => {
+      const div = document.createElement("div");
+      div.className = "tlx-item";
+      div.innerHTML = `
+        <div class="tlx-head">
+          <div><strong>${item.label}</strong> — <span style="color:#475569;font-size:0.86rem;">${item.desc}</span></div>
+          <span class="tlx-val" id="val_${item.id}">50</span>
+        </div>
+        <input type="range" min="0" max="100" step="5" value="50" id="tlx_${item.id}" aria-label="${item.label}" />
+        <div class="anchors"><span>${item.low}</span><span>${item.high}</span></div>
+      `;
+      tlxContainer.appendChild(div);
+      div.querySelector("input").addEventListener("input", (e) => {
+        document.getElementById(`val_${item.id}`).textContent = e.target.value;
+        updateLiveSummary();
+      });
+    });
+
+    function renderLikert(container, items, prefix) {
+      items.forEach((item, idx) => {
+        const div = document.createElement("div");
+        div.className = "likert-row";
+        let radios = "";
+        for (let v = 1; v <= 7; v++) {
+          radios += `<label><input type="radio" name="${item.id}" value="${v}" required /><span>${v}</span></label>`;
+        }
+        div.innerHTML = `
+          <div class="likert-q">${idx + 1}. ${item.text}${item.reverse ? ' <span style="color:#64748b;font-size:0.75rem;">(reverse-scored)</span>' : ""}</div>
+          <div class="likert-opts">${radios}</div>
+        `;
+        container.appendChild(div);
+        div.querySelectorAll("input").forEach((inp) => inp.addEventListener("change", updateLiveSummary));
+      });
+    }
+
+    renderLikert(document.getElementById("trustContainer"), JIAN_TRUST_ITEMS, "trust");
+    renderLikert(document.getElementById("controlContainer"), CONTROL_ITEMS, "ctrl");
+
+    function collectPayload() {
+      const tlx = {};
+      let tlxSum = 0;
+      TLX_ITEMS.forEach((it) => {
+        const val = Number(document.getElementById(`tlx_${it.id}`).value);
+        tlx[it.id] = val;
+        tlxSum += val;
+      });
+      const rawTlx = Number((tlxSum / TLX_ITEMS.length).toFixed(2));
+
+      const trustRaw = {};
+      let trustScoredSum = 0;
+      let trustCount = 0;
+      JIAN_TRUST_ITEMS.forEach((it) => {
+        const sel = document.querySelector(`input[name="${it.id}"]:checked`);
+        if (sel) {
+          const v = Number(sel.value);
+          trustRaw[it.id] = v;
+          trustScoredSum += it.reverse ? (8 - v) : v;
+          trustCount += 1;
+        }
+      });
+      const trustMean = trustCount ? Number((trustScoredSum / trustCount).toFixed(3)) : null;
+
+      const controlRaw = {};
+      let ctrlSum = 0;
+      let ctrlCount = 0;
+      CONTROL_ITEMS.forEach((it) => {
+        const sel = document.querySelector(`input[name="${it.id}"]:checked`);
+        if (sel) {
+          const v = Number(sel.value);
+          controlRaw[it.id] = v;
+          ctrlSum += v;
+          ctrlCount += 1;
+        }
+      });
+      const controlMean = ctrlCount ? Number((ctrlSum / ctrlCount).toFixed(3)) : null;
+
+      return {
+        ts: new Date().toISOString(),
+        participant_id: document.getElementById("participant_id").value.trim().toUpperCase(),
+        condition: document.getElementById("condition").value,
+        task_id: document.getElementById("task_id").value,
+        round_index: Number(document.getElementById("round_index").value),
+        nasa_tlx: { subscales: tlx, raw_tlx_mean: rawTlx },
+        jian_trust: { items: trustRaw, composite_mean: trustMean },
+        control_agency: { items: controlRaw, composite_mean: controlMean },
+        open_ended: {
+          recovery: document.getElementById("oe_recovery").value.trim(),
+          friction: document.getElementById("oe_friction").value.trim(),
+          other: document.getElementById("oe_other").value.trim(),
+        },
+      };
+    }
+
+    function updateLiveSummary() {
+      const p = collectPayload();
+      document.getElementById("summaryBar").innerHTML = `
+        <span class="score-pill">Raw NASA-TLX: ${p.nasa_tlx.raw_tlx_mean}</span>
+        <span class="score-pill">Jian Trust: ${p.jian_trust.composite_mean ?? "—"} / 7</span>
+        <span class="score-pill">Control/Agency: ${p.control_agency.composite_mean ?? "—"} / 7</span>
+      `;
+    }
+    updateLiveSummary();
+
+    document.getElementById("surveyForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const payload = collectPayload();
+      const jsonText = JSON.stringify(payload, null, 2);
+      const out = document.getElementById("output");
+      out.textContent = jsonText;
+      out.style.display = "block";
+
+      const blob = new Blob([jsonText], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `survey_${payload.participant_id || "PXX"}_${payload.task_id}_${payload.condition}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById("copyBtn").addEventListener("click", () => {
+      const jsonText = JSON.stringify(collectPayload(), null, 2);
+      navigator.clipboard.writeText(jsonText);
+      const out = document.getElementById("output");
+      out.textContent = jsonText;
+      out.style.display = "block";
+    });
+  </script>
+</body>
+</html>
