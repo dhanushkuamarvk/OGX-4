@@ -1,0 +1,42 @@
+{
+  "name": "relay-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RELAY AI is an intelligent human-agent collaboration platform that enables people to coordinate, supervise and interact with multiple AI agents through an adaptive, transparent and human-controlled workflow.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "@supabase/supabase-js": "^2.49.4",
+    "@xyflow/react": "^12.6.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "lucide-react": "^0.475.0",
+    "next": "^14.2.28",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.3",
+    "tailwind-merge": "^2.6.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.28",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vitest": "^3.1.1"
+  }
+}
