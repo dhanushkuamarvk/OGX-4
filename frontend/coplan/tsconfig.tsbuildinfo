@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/artifacteditor.tsx","./src/components/markdownpreview.tsx","./src/components/plantree.tsx","./src/components/sessionlauncher.tsx","./src/components/timelinepanel.tsx","./src/components/topbar.tsx","./src/lib/api.ts","./src/store/usecoplanstore.ts","./src/types/contract.ts"],"version":"5.9.3"}
